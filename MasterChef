@@ -638,6 +638,7 @@ contract CapitalPools is Ownable, Initializable {
         uint256 accPerShare;    // Accumulated token per share, times 1e12. See below.
         uint256 syrupPerBlock; 
         uint256 lpSupply;
+        uint256 syrupBalance;
     }
  
     address devAddr;
@@ -660,17 +661,23 @@ contract CapitalPools is Ownable, Initializable {
 
     // Add a new lp to the pool. Can only be called by the owner in the before starting, or the controller can call after starting.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(IERC20 _lpToken,IERC20 _SyrupToken,uint256 _syrupPerBlock,bool _withUpdate) public onlyOwner {
+    function add(IERC20 _lpToken,IERC20 _syrupToken,uint256 _syrupPerBlock,uint256 _amount,bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
+        
+        
+        if (_amount > 0) {
+            _syrupToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+        }
       
         poolInfo.push(PoolInfo({
             lpToken: _lpToken,
-            syrupToken: _SyrupToken,
+            syrupToken: _syrupToken,
             syrupPerBlock: _syrupPerBlock,
             lastRewardBlock: lastRewardBlock,
+            syrupBalance: _amount,
             accPerShare: 0,
             lpSupply: 0
         }));
@@ -726,7 +733,8 @@ contract CapitalPools is Ownable, Initializable {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accPerShare).div(1e12).sub(user.rewardDebt);
             
-            safeTokenTransfer(pool.syrupToken, msg.sender, pending);
+            safeTokenTransfer(pool.syrupToken, msg.sender, pending,pool.syrupBalance);
+            pool.syrupBalance = pool.syrupBalance.sub(pending);
             
         }
         if (_amount > 0) {
@@ -749,7 +757,8 @@ contract CapitalPools is Ownable, Initializable {
         uint256 pending = user.amount.mul(pool.accPerShare).div(1e12).sub(user.rewardDebt);
         
         if (pending > 0) {
-            safeTokenTransfer(pool.syrupToken, msg.sender, pending);
+            safeTokenTransfer(pool.syrupToken, msg.sender, pending,pool.syrupBalance);
+            pool.syrupBalance = pool.syrupBalance.sub(pending);
         }
         user.amount = user.amount.sub(_amount);
         pool.lpSupply = pool.lpSupply.sub(_amount);
@@ -765,15 +774,15 @@ contract CapitalPools is Ownable, Initializable {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         pool.lpToken.safeTransfer(address(msg.sender), user.amount);
-        pool.lpSupply = pool.lpSupply.sub(user.amount);
         emit EmergencyWithdraw(msg.sender, _pid, user.amount);
+        pool.lpSupply = pool.lpSupply.sub(user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
     }
  
 
-    function safeTokenTransfer(IERC20 _token, address _to, uint256 _amount) internal {
-        uint256 bal = _token.balanceOf(address(this));
+    function safeTokenTransfer(IERC20 _token, address _to, uint256 _amount,uint256 _balance) internal {
+        uint256 bal = _balance;
         if (_amount > bal) {
             _token.transfer(_to, bal);
         } else {
