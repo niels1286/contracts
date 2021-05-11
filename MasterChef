@@ -637,6 +637,7 @@ contract CapitalPools is Ownable, Initializable {
         uint256 lastRewardBlock;  // Last block number that token distribution occurs.
         uint256 accPerShare;    // Accumulated token per share, times 1e12. See below.
         uint256 syrupPerBlock; 
+        uint256 lpSupply;
     }
  
     address devAddr;
@@ -670,7 +671,8 @@ contract CapitalPools is Ownable, Initializable {
             syrupToken: _SyrupToken,
             syrupPerBlock: _syrupPerBlock,
             lastRewardBlock: lastRewardBlock,
-            accPerShare: 0
+            accPerShare: 0,
+            lpSupply: 0
         }));
     }
 
@@ -678,7 +680,7 @@ contract CapitalPools is Ownable, Initializable {
     function pendingToken(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        uint256 lpSupply = pool.lpSupply;
         uint256 accPerShare = pool.accPerShare;
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 reward = (block.number.sub(pool.lastRewardBlock)).mul(pool.syrupPerBlock);
@@ -703,7 +705,7 @@ contract CapitalPools is Ownable, Initializable {
             return;
         }
         
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        uint256 lpSupply = pool.lpSupply;
         
         if (lpSupply == 0) {
             pool.lastRewardBlock = block.number;
@@ -731,6 +733,8 @@ contract CapitalPools is Ownable, Initializable {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
         }
         user.amount = user.amount.add(_amount);
+        pool.lpSupply = pool.lpSupply.add(_amount);
+        
         user.rewardDebt = user.amount.mul(pool.accPerShare).div(1e12);
 
         emit Deposit(msg.sender, _pid, _amount);
@@ -748,6 +752,7 @@ contract CapitalPools is Ownable, Initializable {
             safeTokenTransfer(pool.syrupToken, msg.sender, pending);
         }
         user.amount = user.amount.sub(_amount);
+        pool.lpSupply = pool.lpSupply.sub(_amount);
         user.rewardDebt = user.amount.mul(pool.accPerShare).div(1e12);
         if (_amount > 0) {
             pool.lpToken.safeTransfer(address(msg.sender), _amount);
