@@ -608,7 +608,7 @@ contract Ownable is Context {
 }
  
 
-contract CapitalPools is Ownable, Initializable {
+contract NervePools is Ownable, Initializable {
 
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -667,11 +667,8 @@ contract CapitalPools is Ownable, Initializable {
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         
-        
-        if (_amount > 0) {
-            _syrupToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-        }
-      
+        require(_amount > 0, "add: amount not good");
+         
         poolInfo.push(PoolInfo({
             lpToken: _lpToken,
             syrupToken: _syrupToken,
@@ -682,7 +679,7 @@ contract CapitalPools is Ownable, Initializable {
             lpSupply: 0
         }));
     }
-
+    
     // View function to see pending token on frontend.
     function pendingToken(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
@@ -733,7 +730,7 @@ contract CapitalPools is Ownable, Initializable {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accPerShare).div(1e12).sub(user.rewardDebt);
             
-            safeTokenTransfer(pool.syrupToken, msg.sender, pending,pool.syrupBalance);
+            safeTokenTransfer(pool.syrupToken, msg.sender, pending, pool.syrupBalance);
             pool.syrupBalance = pool.syrupBalance.sub(pending);
             
         }
@@ -781,11 +778,14 @@ contract CapitalPools is Ownable, Initializable {
     }
  
 
-    function safeTokenTransfer(IERC20 _token, address _to, uint256 _amount,uint256 _balance) internal {
-        uint256 bal = _balance;
-        if (_amount > bal) {
+    function safeTokenTransfer(IERC20 _token, address _to, uint256 _amount,uint256 _poolBalance) internal {
+        uint256 bal = _token.balanceOf(address(this)); 
+        
+        if (_amount > bal && _poolBalance > bal) {
             _token.transfer(_to, bal);
-        } else {
+        } else if(_amount > _poolBalance && bal > _poolBalance){
+            _token.transfer(_to, _poolBalance);
+        }else{
             _token.transfer(_to, _amount);
         }
     }
