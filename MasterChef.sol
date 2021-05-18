@@ -633,12 +633,12 @@ contract NervePools is Ownable, Initializable {
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken;    
-        IERC20 syrupToken; // Address of LP token contract.
+        IERC20 candyToken; // Address of LP token contract.
         uint256 lastRewardBlock;  // Last block number that token distribution occurs.
         uint256 accPerShare;    // Accumulated token per share, times 1e12. See below.
-        uint256 syrupPerBlock; 
+        uint256 candyPerBlock; 
         uint256 lpSupply;
-        uint256 syrupBalance;
+        uint256 candyBalance;
     }
  
     address devAddr;
@@ -661,7 +661,7 @@ contract NervePools is Ownable, Initializable {
 
     // Add a new lp to the pool. Can only be called by the owner in the before starting, or the controller can call after starting.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(IERC20 _lpToken,IERC20 _syrupToken,uint256 _syrupPerBlock,uint256 _amount,bool _withUpdate) public onlyOwner {
+    function add(IERC20 _lpToken,IERC20 _candyToken,uint256 _candyPerBlock,uint256 _amount,bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -671,14 +671,23 @@ contract NervePools is Ownable, Initializable {
          
         poolInfo.push(PoolInfo({
             lpToken: _lpToken,
-            syrupToken: _syrupToken,
-            syrupPerBlock: _syrupPerBlock,
+            candyToken: _candyToken,
+            candyPerBlock: _candyPerBlock,
             lastRewardBlock: lastRewardBlock,
-            syrupBalance: _amount,
+            candyBalance: _amount,
             accPerShare: 0,
             lpSupply: 0
         }));
     }
+    
+    function addCandy(uint256 _pid, uint256 _amount, bool _withUpdate) public onlyOwner {
+        if (_withUpdate) {
+            massUpdatePools();
+        }
+         PoolInfo storage pool = poolInfo[_pid];
+         pool.candyBalance = pool.candyBalance.add(_amount);
+    }
+    
     
     // View function to see pending token on frontend.
     function pendingToken(uint256 _pid, address _user) external view returns (uint256) {
@@ -687,7 +696,7 @@ contract NervePools is Ownable, Initializable {
         uint256 lpSupply = pool.lpSupply;
         uint256 accPerShare = pool.accPerShare;
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
-            uint256 reward = (block.number.sub(pool.lastRewardBlock)).mul(pool.syrupPerBlock);
+            uint256 reward = (block.number.sub(pool.lastRewardBlock)).mul(pool.candyPerBlock);
             accPerShare = accPerShare.add(reward.mul(1e12).div(lpSupply));   // 此处乘以1e12，在下面会除以1e12
         }
         uint256 pendingReward = user.amount.mul(accPerShare).div(1e12).sub(user.rewardDebt);
@@ -716,7 +725,7 @@ contract NervePools is Ownable, Initializable {
             return;
         }
         
-        uint256 reward = (block.number.sub(pool.lastRewardBlock)).mul(pool.syrupPerBlock);
+        uint256 reward = (block.number.sub(pool.lastRewardBlock)).mul(pool.candyPerBlock);
        
         pool.accPerShare = pool.accPerShare.add(reward.mul(1e12).div(lpSupply)); 
        
@@ -730,8 +739,8 @@ contract NervePools is Ownable, Initializable {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accPerShare).div(1e12).sub(user.rewardDebt);
             
-            safeTokenTransfer(pool.syrupToken, msg.sender, pending, pool.syrupBalance);
-            pool.syrupBalance = pool.syrupBalance.sub(pending);
+            safeTokenTransfer(pool.candyToken, msg.sender, pending, pool.candyBalance);
+            pool.candyBalance = pool.candyBalance.sub(pending);
             
         }
         if (_amount > 0) {
@@ -754,8 +763,8 @@ contract NervePools is Ownable, Initializable {
         uint256 pending = user.amount.mul(pool.accPerShare).div(1e12).sub(user.rewardDebt);
         
         if (pending > 0) {
-            safeTokenTransfer(pool.syrupToken, msg.sender, pending,pool.syrupBalance);
-            pool.syrupBalance = pool.syrupBalance.sub(pending);
+            safeTokenTransfer(pool.candyToken, msg.sender, pending,pool.candyBalance);
+            pool.candyBalance = pool.candyBalance.sub(pending);
         }
         user.amount = user.amount.sub(_amount);
         pool.lpSupply = pool.lpSupply.sub(_amount);
