@@ -740,8 +740,11 @@ contract NervePools is Ownable, Initializable {
             uint256 pending = user.amount.mul(pool.accPerShare).div(1e12).sub(user.rewardDebt);
             
             safeTokenTransfer(pool.candyToken, msg.sender, pending, pool.candyBalance);
-            pool.candyBalance = pool.candyBalance.sub(pending);
-            
+            if(pool.candyBalance < pending){
+                pool.candyBalance = 0;
+            }else{
+                pool.candyBalance = pool.candyBalance.sub(pending);
+            }
         }
         if (_amount > 0) {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
@@ -764,7 +767,11 @@ contract NervePools is Ownable, Initializable {
         
         if (pending > 0) {
             safeTokenTransfer(pool.candyToken, msg.sender, pending,pool.candyBalance);
-            pool.candyBalance = pool.candyBalance.sub(pending);
+            if( pool.candyBalance < pending){
+                pool.candyBalance = 0;
+            }else{
+                pool.candyBalance = pool.candyBalance.sub(pending);
+            }
         }
         user.amount = user.amount.sub(_amount);
         pool.lpSupply = pool.lpSupply.sub(_amount);
