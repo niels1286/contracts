@@ -797,7 +797,7 @@ contract NervePools is Ownable, Initializable {
     function safeTokenTransfer(IERC20 _token, address _to, uint256 _amount,uint256 _poolBalance) internal {
         uint256 bal = _token.balanceOf(address(this)); 
         
-        if (_amount > bal && _poolBalance > bal) {
+        if (_amount > bal && _poolBalance >= bal) {
             _token.transfer(_to, bal);
         } else if(_amount > _poolBalance && bal > _poolBalance){
             _token.transfer(_to, _poolBalance);
